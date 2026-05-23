@@ -30,6 +30,11 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y libssl-dev libsasl2-dev libcurl4-openssl-dev cmake
+
       - uses: actions/cache@v4
         with:
           path: |
