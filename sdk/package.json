@@ -1,0 +1,26 @@
+{
+  "name": "@logwatch/node",
+  "version": "1.0.0",
+  "description": "Node.js SDK for LogWatch — AI-powered log anomaly detection",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "logwatch",
+    "anomaly",
+    "detection",
+    "monitoring",
+    "observability"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "^5.4.5"
+  }
+}

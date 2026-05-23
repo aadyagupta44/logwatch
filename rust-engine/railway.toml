@@ -1,0 +1,21 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "rust-engine/Dockerfile"
+
+[deploy]
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+
+# IMPORTANT: In the Railway service settings, set "Root Directory" to /
+# so that the Dockerfile can COPY training/models/isolation_forest.onnx
+# and rust-engine/src from the repository root.
+#
+# Required environment variables — set in Railway service dashboard:
+#
+#   DATABASE_URL              postgres://user:pass@host/db?sslmode=require  (from Neon)
+#   KAFKA_BROKERS             host:port  (from Upstash)
+#   KAFKA_SECURITY_PROTOCOL   SASL_SSL
+#   KAFKA_USERNAME            Upstash SASL username
+#   KAFKA_PASSWORD            Upstash SASL password
+#   RUST_LOG                  info

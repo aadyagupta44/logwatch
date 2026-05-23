@@ -1,0 +1,32 @@
+# Training data (too large for GitHub)
+training/data/
+training/venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pth
+
+# Rust build artifacts
+rust-engine/target/
+
+# Spring Boot build artifacts
+spring-api/target/
+
+# Node modules
+node_modules/
+frontend/node_modules/
+docs/node_modules/
+sdk/node_modules/
+
+# Environment files
+.env
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker volumes
+infra/postgres-data/

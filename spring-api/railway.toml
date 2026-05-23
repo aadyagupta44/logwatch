@@ -1,0 +1,22 @@
+[build]
+builder = "NIXPACKS"
+buildCommand = "mvn package -DskipTests"
+
+[deploy]
+startCommand = "java -jar target/spring-api-0.0.1-SNAPSHOT.jar"
+healthcheckPath = "/actuator/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+
+# Required environment variables — set these in the Railway service dashboard:
+#
+#   DATABASE_URL      postgresql://user:pass@host/db?sslmode=require  (from Neon)
+#   DB_URL            jdbc:postgresql://host/db?sslmode=require        (JDBC form of DATABASE_URL)
+#   DB_USERNAME       neon database user
+#   DB_PASSWORD       neon database password
+#   JWT_SECRET        random 64-char hex string
+#   KAFKA_BOOTSTRAP_SERVERS   host:port  (from Upstash)
+#   KAFKA_USERNAME            Upstash SASL username
+#   KAFKA_PASSWORD            Upstash SASL password
+#   CORS_ALLOWED_ORIGINS      https://your-frontend.vercel.app
