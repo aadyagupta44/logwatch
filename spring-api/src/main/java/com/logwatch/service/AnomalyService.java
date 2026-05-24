@@ -45,6 +45,7 @@ public class AnomalyService {
 
     public AnomalySummaryDto getSummary(UUID orgId) {
         long total = anomalyRepository.countByOrganisationId(orgId);
+        double avgScore = anomalyRepository.avgScoreByOrganisationId(orgId);
         
         Map<String, Long> severityCounts = anomalyRepository.countBySeverity(orgId).stream()
                 .collect(Collectors.toMap(
@@ -66,6 +67,7 @@ public class AnomalyService {
 
         return AnomalySummaryDto.builder()
                 .totalCount(total)
+                .avgScore(avgScore)
                 .countBySeverity(severityCounts)
                 .topServices(topServices)
                 .countByHour(countByHour)

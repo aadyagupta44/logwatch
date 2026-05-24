@@ -38,5 +38,8 @@ public interface AnomalyRepository extends JpaRepository<Anomaly, UUID> {
            "WHERE org_id = :orgId AND detected_at >= :since GROUP BY hr ORDER BY hr", nativeQuery = true)
     List<Object[]> countByHour(UUID orgId, LocalDateTime since);
 
+    @Query("SELECT COALESCE(AVG(a.anomalyScore), 0.0) FROM Anomaly a WHERE a.organisation.id = :orgId")
+    double avgScoreByOrganisationId(UUID orgId);
+
     Optional<Anomaly> findByIdAndOrganisationId(UUID id, UUID orgId);
 }

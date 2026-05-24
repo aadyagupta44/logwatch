@@ -88,7 +88,7 @@ const DashboardPage: React.FC = () => {
           <Card title="Total Anomalies" value={summary?.totalCount || 0} icon={<Activity className="text-indigo-400" />} />
           <Card title="High Severity" value={highSeverityCount} icon={<AlertCircle className="text-red-400" />} />
           <Card title="Services Monitored" value={servicesMonitored} icon={<Shield className="text-green-400" />} />
-          <Card title="Avg Score" value={'-0.82'} icon={<Cpu className="text-amber-400" />} />
+          <Card title="Avg Score" value={summary?.avgScore != null ? summary.avgScore.toFixed(3) : '—'} icon={<Cpu className="text-amber-400" />} />
         </div>
 
         {/* Charts Row */}

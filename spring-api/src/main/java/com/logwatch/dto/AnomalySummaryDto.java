@@ -15,7 +15,8 @@ import java.util.Map;
 @Schema(description = "Summary of anomalies for an organisation")
 public class AnomalySummaryDto {
     private long totalCount;
+    private double avgScore;
     private Map<String, Long> countBySeverity;
     private Map<String, Long> topServices;
-    private Map<String, Long> countByHour; // Key: ISO hour string, Value: count
+    private Map<String, Long> countByHour;
 }
