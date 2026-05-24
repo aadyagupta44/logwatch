@@ -155,15 +155,4 @@ jobs:
           cache-from: type=gha,scope=spring-api
           cache-to: type=gha,mode=max,scope=spring-api
 
-  # ─── Job 5: Deploy via Railway webhook ──────────────────────────────────────
-  deploy:
-    name: Deploy to Railway
-    needs: [build-and-push]
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - name: Trigger Railway redeploy
-        run: |
-          curl -fSsX POST "${{ secrets.RAILWAY_WEBHOOK_URL }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"sha\":\"${{ github.sha }}\",\"ref\":\"${{ github.ref }}\"}"
+  # Railway auto-deploys on push to main via GitHub integration — no webhook needed.
