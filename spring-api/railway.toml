@@ -1,9 +1,8 @@
 [build]
-builder = "NIXPACKS"
-buildCommand = "mvn package -DskipTests"
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "java -jar target/spring-api-0.0.1-SNAPSHOT.jar"
 healthcheckPath = "/actuator/health"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
