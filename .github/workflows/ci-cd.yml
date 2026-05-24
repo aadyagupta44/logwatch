@@ -166,4 +166,4 @@ jobs:
         run: |
           curl -fSsX POST "${{ secrets.RAILWAY_WEBHOOK_URL }}" \
             -H "Content-Type: application/json" \
-            -d '{"sha":"${{ github.sha }}","ref":"${{ github.ref }}"}'
+            -d "{\"sha\":\"${{ github.sha }}\",\"ref\":\"${{ github.ref }}\"}"
