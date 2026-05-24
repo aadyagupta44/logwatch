@@ -38,45 +38,35 @@ impl SlidingWindow {
             return [0.0; 7];
         }
 
-        let mut error_count = 0.0;
-        let mut warn_count = 0.0;
-        let mut sum_latency = 0.0;
-        let mut latencies = Vec::with_capacity(self.logs.len());
-        let mut unique_errors = HashSet::new();
+        let mut error_count = 0.0f32;
+        let mut warn_count = 0.0f32;
+        let mut info_count = 0.0f32;
+        let mut unique_paths = HashSet::new();
 
         for log in &self.logs {
-            if log.level == "ERROR" {
-                error_count += 1.0;
-                // Using status_code as proxy for unique errors
-                unique_errors.insert(log.status_code);
-            } else if log.level == "WARN" {
-                warn_count += 1.0;
+            match log.level.as_str() {
+                "ERROR" => error_count += 1.0,
+                "WARN"  => warn_count  += 1.0,
+                "INFO"  => info_count  += 1.0,
+                _       => {}
             }
-            
-            let lat = log.latency_ms as f32;
-            sum_latency += lat;
-            latencies.push(lat);
+            unique_paths.insert(log.path.clone());
         }
 
-        let avg_latency = sum_latency / total_count;
         let error_ratio = error_count / total_count;
-        let unique_error_count = unique_errors.len() as f32;
+        let warn_ratio  = warn_count  / total_count;
+        let unique_components = unique_paths.len() as f32;
 
-        // Calculate p99 latency
-        latencies.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        let p99_idx = ((total_count * 0.99).ceil() as usize)
-            .saturating_sub(1)
-            .min(latencies.len().saturating_sub(1));
-        let p99_latency = if latencies.is_empty() { 0.0 } else { latencies[p99_idx] };
-
+        // Order matches training: total_count, error_count, warn_count, info_count,
+        //                         error_ratio, warn_ratio, unique_components
         [
             total_count,
             error_count,
             warn_count,
-            avg_latency,
-            p99_latency,
-            unique_error_count,
+            info_count,
             error_ratio,
+            warn_ratio,
+            unique_components,
         ]
     }
 

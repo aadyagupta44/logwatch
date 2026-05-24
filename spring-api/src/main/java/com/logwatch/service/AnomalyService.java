@@ -24,6 +24,9 @@ public class AnomalyService {
     private final AnomalyRepository anomalyRepository;
 
     public Page<AnomalyDto> getAnomalies(UUID orgId, String service, LocalDateTime from, LocalDateTime to, String severity, Pageable pageable) {
+        if (service == null && from == null && to == null && severity == null) {
+            return anomalyRepository.findByOrganisationId(orgId, pageable).map(this::convertToDto);
+        }
         return anomalyRepository.findFiltered(orgId, service, from, to, severity, pageable)
                 .map(this::convertToDto);
     }

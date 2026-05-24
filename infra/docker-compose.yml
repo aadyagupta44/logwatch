@@ -1,12 +1,13 @@
-version: '3.8'
-
 services:
+
+  # ── Zookeeper ───────────────────────────────────────────────────────────────
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
 
+  # ── Kafka broker ────────────────────────────────────────────────────────────
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     depends_on:
@@ -16,32 +17,60 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      # Internal listener (other containers): kafka:29092
+      # External listener (host machine):     localhost:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     healthcheck:
       test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
       interval: 10s
-      timeout: 5s
-      retries: 5
+      timeout: 10s
+      retries: 10
+      start_period: 30s
 
+  # ── PostgreSQL ───────────────────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
+    ports:
+      - "5432:5432"
     environment:
       POSTGRES_DB: logwatch
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
-    ports:
-      - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d logwatch"]
       interval: 10s
       timeout: 5s
       retries: 5
 
+  # ── Rust anomaly-detection engine ────────────────────────────────────────────
+  rust-engine:
+    build:
+      context: ..
+      dockerfile: rust-engine/Dockerfile
+    ports:
+      - "9090:9090"
+    environment:
+      DATABASE_URL: postgres://postgres:password@postgres:5432/logwatch
+      KAFKA_BROKERS: kafka:29092
+      KAFKA_TOPIC: raw-logs
+      KAFKA_GROUP_ID: rust-engine-group
+      KAFKA_SECURITY_PROTOCOL: PLAINTEXT
+      ONNX_MODEL_PATH: /app/models/isolation_forest.onnx
+      RUST_LOG: info
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: on-failure
+
+  # ── Spring Boot REST API ─────────────────────────────────────────────────────
   spring-api:
     build:
       context: ../spring-api
@@ -52,42 +81,33 @@ services:
       DB_URL: jdbc:postgresql://postgres:5432/logwatch
       DB_USERNAME: postgres
       DB_PASSWORD: password
-      KAFKA_SERVERS: kafka:9092
-      JWT_SECRET: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+      JWT_SECRET: logwatch-super-secret-jwt-key-change-in-production
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_SECURITY_PROTOCOL: PLAINTEXT
+      KAFKA_SASL_MECHANISM: PLAIN
+      KAFKA_SASL_JAAS_CONFIG: ""
+      CORS_ALLOWED_ORIGINS: http://localhost:5173
     depends_on:
-      postgres:
-        condition: service_healthy
       kafka:
         condition: service_healthy
-
-  rust-engine:
-    build:
-      context: ..
-      dockerfile: rust-engine/Dockerfile
-    ports:
-      - "9090:9090"
-    environment:
-      DATABASE_URL: postgres://postgres:password@postgres:5432/logwatch
-      KAFKA_BROKERS: kafka:9092
-      RUST_LOG: info
-    depends_on:
       postgres:
         condition: service_healthy
-      kafka:
-        condition: service_healthy
+    restart: on-failure
 
-  log-simulator:
+  # ── React frontend ────────────────────────────────────────────────────────────
+  frontend:
     build:
-      context: ../training
+      context: ../frontend
       dockerfile: Dockerfile
-    environment:
-      KAFKA_BROKERS: kafka:9092
+    ports:
+      - "5173:80"
     depends_on:
-      kafka:
-        condition: service_healthy
+      - spring-api
+    restart: on-failure
 
+  # ── Prometheus ────────────────────────────────────────────────────────────────
   prometheus:
-    image: prom/prometheus:v2.48.0
+    image: prom/prometheus:latest
     ports:
       - "9091:9090"
     volumes:
@@ -100,20 +120,34 @@ services:
       - rust-engine
       - spring-api
 
+  # ── Grafana ───────────────────────────────────────────────────────────────────
   grafana:
-    image: grafana/grafana:10.2.2
+    image: grafana/grafana:10.4.3
     ports:
-      - "3000:3000"
+      - "3001:3000"
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
+      - grafana-data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
-      - grafana_data:/var/lib/grafana
     depends_on:
       - prometheus
 
+  # ── Log simulator ─────────────────────────────────────────────────────────────
+  log-simulator:
+    build:
+      context: ../training
+      dockerfile: Dockerfile
+    environment:
+      KAFKA_BROKERS: kafka:29092
+      PYTHONUNBUFFERED: "1"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: on-failure
+
 volumes:
-  postgres_data:
-  grafana_data:
+  postgres-data:
+  grafana-data:

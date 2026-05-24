@@ -23,7 +23,7 @@ const LoginPage: React.FC = () => {
         password
       });
 
-      const { token, email, organisationName } = response.data;
+      const { token, organisationName } = response.data;
       login(token, { email, organisationName });
       navigate('/dashboard');
     } catch (err: any) {

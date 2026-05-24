@@ -133,7 +133,15 @@ pub async fn start_consumer(
                                 if inference.is_anomaly(score) {
                                     let severity = if score < -0.3 { "HIGH" } else { "MEDIUM" };
                                     counter!("logwatch_anomalies_detected_total", "severity" => severity).increment(1);
-                                    
+
+                                    let org_id = sqlx::query_scalar::<_, Uuid>(
+                                        "SELECT id FROM organisations ORDER BY created_at LIMIT 1"
+                                    )
+                                    .fetch_optional(&db_pool)
+                                    .await
+                                    .unwrap_or(None)
+                                    .unwrap_or_else(Uuid::new_v4);
+
                                     let anomaly = Anomaly {
                                         id: Uuid::new_v4(),
                                         service_name: service_name.clone(),
@@ -141,7 +149,7 @@ pub async fn start_consumer(
                                         anomaly_score: score,
                                         feature_vector: json!(features),
                                         severity: severity.to_string(),
-                                        org_id: Uuid::new_v4(), // Auto-generated for demo
+                                        org_id,
                                         acknowledged: false,
                                     };
 

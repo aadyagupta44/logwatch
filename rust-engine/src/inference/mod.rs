@@ -25,6 +25,6 @@ impl OnnxInference {
     }
 
     pub fn is_anomaly(&self, score: f32) -> bool {
-        score < -0.2
+        score < 0.0
     }
 }

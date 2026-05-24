@@ -59,7 +59,7 @@ const AnomalyDetailPage: React.FC = () => {
   }
 
   // Parse feature vector (assuming comma-separated string from backend)
-  const features = anomaly.featureVector ? anomaly.featureVector.split(',').map(Number) : [];
+  const features: number[] = anomaly.featureVector ? anomaly.featureVector.split(',').map(Number) : [];
   const featureNames = ['Log Level', 'Message Entropy', 'Token Count', 'Burst Rate', 'Keyword Match', 'Time Delta', 'User Agent'];
 
   return (
