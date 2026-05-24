@@ -50,17 +50,17 @@ LogWatch is a streaming ML pipeline. Logs flow from your application through a c
 │  └────────────┘    └──────────────────┘    │  total_count           │ │
 │                                            │  error_count           │ │
 │                                            │  warn_count            │ │
-│                                            │  avg_latency_ms        │ │
-│                                            │  p99_latency_ms        │ │
-│                                            │  unique_error_count    │ │
+│                                            │  info_count            │ │
 │                                            │  error_ratio           │ │
+│                                            │  warn_ratio            │ │
+│                                            │  unique_components     │ │
 │                                            └──────────┬─────────────┘ │
 │                                                       │               │
 │                                         ┌─────────────▼─────────────┐ │
 │                                         │ ONNX Inference             │ │
 │                                         │ IsolationForest model      │ │
-│                                         │ score < -0.2 → anomaly    │ │
-│                                         │ score < -0.3 → HIGH sev.  │ │
+│                                         │ score < 0.0 → anomaly     │ │
+│                                         │ score < -0.1 → HIGH sev.  │ │
 │                                         └─────────────┬─────────────┘ │
 │                                                       │               │
 │                              ┌────────────────────────▼──────────────┐│
@@ -146,13 +146,13 @@ The performance-critical stream processor. Written in async Rust with Tokio. Run
 2. Aggregates lines into per-service 60-second sliding windows.
 3. When a window closes, extracts a 7-dimensional feature vector.
 4. Runs the feature vector through an ONNX IsolationForest model.
-5. If the anomaly score is below −0.2, persists an anomaly row to Postgres and publishes to `anomaly-alerts`.
+5. If the anomaly score is below 0.0, persists an anomaly row to Postgres and publishes to `anomaly-alerts`.
 
 The Rust Engine also exposes a Prometheus `/metrics` endpoint on port 9090.
 
 ### ONNX IsolationForest model
 
-Trained offline on the HDFS log dataset (~11 M lines). The model is an unsupervised IsolationForest (100 estimators, 5% contamination) exported to ONNX with `skl2onnx`. At inference time `ort` loads it as a native ONNX Runtime session. No Python interpreter at runtime.
+Trained offline on synthetic HTTP log data (52,632 samples matching the feature distributions of real HTTP service logs). The model is an unsupervised IsolationForest (100 estimators, 5% contamination) exported to ONNX with `skl2onnx` via `training/retrain_http.py`. At inference time `ort` loads it as a native ONNX Runtime session. No Python interpreter at runtime.
 
 ### PostgreSQL
 
@@ -187,11 +187,11 @@ The entire path from a log line being emitted in your app to it appearing as an 
 | Property | Value |
 |---|---|
 | Algorithm | IsolationForest |
-| Training data | HDFS log dataset (11 M lines, ~20 K block windows) |
+| Training data | Synthetic HTTP log data (52,632 samples, `training/retrain_http.py`) |
 | Features | 7-dimensional (see feature vector above) |
 | Contamination | 5% |
 | Estimators | 100 |
-| Anomaly threshold | score < −0.2 |
-| HIGH severity | score < −0.3 |
-| Export format | ONNX (skl2onnx), 462 KB |
+| Anomaly threshold | score < 0.0 |
+| HIGH severity | score < −0.1 |
+| Export format | ONNX (skl2onnx), 787.8 KB |
 | Runtime | ONNX Runtime via `ort` crate, no Python |
