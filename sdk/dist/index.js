@@ -42,39 +42,48 @@ class LogWatch extends events_1.EventEmitter {
         super();
         this.buffer = [];
         this.timer = null;
+        this.originalHttpEmit = null;
         this.apiKey = config.apiKey;
         this.service = config.service ?? 'service';
         this.baseUrl = config.baseUrl ?? 'http://localhost:8080';
         this.flushInterval = config.flushInterval ?? 5000;
         this.batchSize = config.batchSize ?? 100;
     }
-    /**
-     * Create a global singleton instance and start flushing.
-     * Call once at app startup — use anywhere via the returned instance.
-     */
+    /** Create a global singleton, attach it, and return it. */
     static init(config) {
-        LogWatch.instance = new LogWatch(config).attach();
+        LogWatch.instance = new LogWatch(config);
         return LogWatch.instance;
     }
-    /** Start periodic flushing of buffered log lines. */
+    /**
+     * Start capturing HTTP traffic and flushing logs.
+     *
+     * Patches Node.js core http.Server so every request is captured
+     * automatically — works with Express, Fastify, Koa, NestJS, vanilla http,
+     * or any other framework.
+     */
     attach() {
         if (this.timer)
             return this;
+        this._patchHttp();
         this.timer = setInterval(() => { void this.flush(); }, this.flushInterval);
         this.emit('attached');
         return this;
     }
-    /** Stop the flush timer and drain remaining buffer. */
+    /** Stop capturing, restore Node.js http, and drain the buffer. */
     detach() {
         if (this.timer) {
             clearInterval(this.timer);
             this.timer = null;
         }
+        if (this.originalHttpEmit) {
+            http.Server.prototype.emit = this.originalHttpEmit;
+            this.originalHttpEmit = null;
+        }
         void this.flush();
         this.emit('detached');
         return this;
     }
-    /** Buffer a single raw log line for ingestion. */
+    /** Buffer a raw log line manually (for background jobs, queue consumers, etc.). */
     log(line) {
         const trimmed = line.trimEnd();
         if (trimmed) {
@@ -84,28 +93,6 @@ class LogWatch extends events_1.EventEmitter {
             }
         }
         return this;
-    }
-    /**
-     * Express/Connect middleware.
-     * Drop it in with app.use(lw.expressMiddleware()) and every HTTP request
-     * is automatically captured and shipped to LogWatch in the correct format.
-     */
-    expressMiddleware() {
-        const self = this;
-        return function logwatchMiddleware(req, res, next) {
-            const start = Date.now();
-            res.on('finish', () => {
-                const latency = Date.now() - start;
-                const ts = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
-                const status = res.statusCode;
-                const level = status >= 500 ? 'ERROR' : status >= 400 ? 'WARN' : 'INFO';
-                const method = req.method ?? 'GET';
-                const path = req.path ?? req.url ?? '/';
-                const line = `${ts} ${level} ${self.service} HTTP ${method} ${path} ${status} ${latency}ms`;
-                self.log(line);
-            });
-            next();
-        };
     }
     /** Flush all buffered lines to the LogWatch ingest API. */
     async flush() {
@@ -121,6 +108,28 @@ class LogWatch extends events_1.EventEmitter {
             this.emit('error', err);
             return null;
         }
+    }
+    _patchHttp() {
+        const self = this;
+        const original = http.Server.prototype.emit;
+        this.originalHttpEmit = original;
+        http.Server.prototype.emit = function (event, ...args) {
+            if (event === 'request') {
+                const req = args[0];
+                const res = args[1];
+                const start = Date.now();
+                res.on('finish', () => {
+                    const latency = Date.now() - start;
+                    const ts = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+                    const status = res.statusCode;
+                    const level = status >= 500 ? 'ERROR' : status >= 400 ? 'WARN' : 'INFO';
+                    const method = req.method ?? 'GET';
+                    const path = req.url ?? '/';
+                    self.log(`${ts} ${level} ${self.service} HTTP ${method} ${path} ${status} ${latency}ms`);
+                });
+            }
+            return original.apply(this, args);
+        };
     }
     _post(lines) {
         return new Promise((resolve, reject) => {

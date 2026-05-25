@@ -1,30 +1,25 @@
 const express = require('express');
 const { LogWatch } = require('@logwatch/node');
 
-const app = express();
-app.use(express.json());
-
-// ── LogWatch setup (2 lines) ───────────────────────────────────────────────────
-const lw = LogWatch.init({
+// ── LogWatch — one line, works with any framework ──────────────────────────────
+LogWatch.init({
   apiKey: process.env.LOGWATCH_API_KEY || 'paste-your-api-key-here',
   service: 'payment-service',
   baseUrl: 'https://logwatch-production.up.railway.app',
-});
+}).attach();
 
-app.use(lw.expressMiddleware());
+const lw = LogWatch.init; // already created above, just for event listener below
 
-lw.on('flushed', ({ accepted }) => {
-  if (accepted > 0) console.log(`[logwatch] flushed ${accepted} log lines`);
-});
+// ── App ────────────────────────────────────────────────────────────────────────
+const app = express();
+app.use(express.json());
 
-// ── Chaos mode toggle ──────────────────────────────────────────────────────────
 let chaosMode = false;
 
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// ── Routes ─────────────────────────────────────────────────────────────────────
 app.post('/payments', async (req, res) => {
   const latency = chaosMode ? 1500 + Math.random() * 2500 : 30 + Math.random() * 90;
   await delay(latency);
@@ -62,20 +57,19 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', chaos: chaosMode });
 });
 
-// ── Chaos control ──────────────────────────────────────────────────────────────
 app.post('/chaos/enable', (req, res) => {
   chaosMode = true;
-  console.log('\n🔴 CHAOS MODE ENABLED — payment-service will start failing\n');
+  console.log('\n🔴 CHAOS MODE ON — payment-service is now failing\n');
   res.json({ chaos: true });
 });
 
 app.post('/chaos/disable', (req, res) => {
   chaosMode = false;
-  console.log('\n🟢 Chaos mode disabled\n');
+  console.log('\n🟢 Chaos mode off\n');
   res.json({ chaos: false });
 });
 
-// ── Auto traffic simulator ─────────────────────────────────────────────────────
+// ── Auto traffic ───────────────────────────────────────────────────────────────
 function simulateTraffic() {
   const calls = [
     () => fetch('http://localhost:3000/payments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount: 49.99 }) }).catch(() => {}),
@@ -84,22 +78,16 @@ function simulateTraffic() {
     () => fetch('http://localhost:3000/orders').catch(() => {}),
     () => fetch('http://localhost:3000/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(() => {}),
   ];
-
   setInterval(() => {
-    const count = 3 + Math.floor(Math.random() * 3);
-    for (let i = 0; i < count; i++) {
-      calls[Math.floor(Math.random() * calls.length)]();
-    }
+    const n = 3 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < n; i++) calls[Math.floor(Math.random() * calls.length)]();
   }, 2000);
 }
 
-// ── Start ──────────────────────────────────────────────────────────────────────
-const PORT = 3000;
-app.listen(PORT, () => {
-  console.log(`\n  Demo service running on http://localhost:${PORT}`);
-  console.log(`  LogWatch SDK attached · flushing every 5s\n`);
-  console.log(`  POST /chaos/enable   → trigger payment-service failures`);
-  console.log(`  POST /chaos/disable  → back to normal`);
-  console.log(`  GET  /health         → service status\n`);
+app.listen(3000, () => {
+  console.log('\n  Demo service running — http://localhost:3000');
+  console.log('  LogWatch attached · shipping logs every 5s\n');
+  console.log('  POST /chaos/enable  → trigger failures');
+  console.log('  POST /chaos/disable → restore normal\n');
   simulateTraffic();
 });

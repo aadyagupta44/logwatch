@@ -19,26 +19,25 @@ export declare class LogWatch extends EventEmitter {
     private readonly batchSize;
     private buffer;
     private timer;
+    private originalHttpEmit;
     constructor(config: LogWatchConfig);
-    /**
-     * Create a global singleton instance and start flushing.
-     * Call once at app startup — use anywhere via the returned instance.
-     */
+    /** Create a global singleton, attach it, and return it. */
     static init(config: LogWatchConfig): LogWatch;
-    /** Start periodic flushing of buffered log lines. */
-    attach(): this;
-    /** Stop the flush timer and drain remaining buffer. */
-    detach(): this;
-    /** Buffer a single raw log line for ingestion. */
-    log(line: string): this;
     /**
-     * Express/Connect middleware.
-     * Drop it in with app.use(lw.expressMiddleware()) and every HTTP request
-     * is automatically captured and shipped to LogWatch in the correct format.
+     * Start capturing HTTP traffic and flushing logs.
+     *
+     * Patches Node.js core http.Server so every request is captured
+     * automatically — works with Express, Fastify, Koa, NestJS, vanilla http,
+     * or any other framework.
      */
-    expressMiddleware(): (req: any, res: any, next: any) => void;
+    attach(): this;
+    /** Stop capturing, restore Node.js http, and drain the buffer. */
+    detach(): this;
+    /** Buffer a raw log line manually (for background jobs, queue consumers, etc.). */
+    log(line: string): this;
     /** Flush all buffered lines to the LogWatch ingest API. */
     flush(): Promise<FlushResult | null>;
+    private _patchHttp;
     private _post;
 }
 export default LogWatch;
