@@ -1,14 +1,16 @@
 const express = require('express');
 const { LogWatch } = require('@logwatch/node');
 
-// ── LogWatch — one line, works with any framework ──────────────────────────────
-LogWatch.init({
+// ── LogWatch — two lines, works with any framework ────────────────────────────
+const lw = LogWatch.init({
   apiKey: process.env.LOGWATCH_API_KEY || 'paste-your-api-key-here',
   service: 'payment-service',
   baseUrl: 'https://logwatch-production.up.railway.app',
 }).attach();
 
-const lw = LogWatch.init; // already created above, just for event listener below
+lw.on('flushed', ({ accepted }) => {
+  if (accepted > 0) console.log(`[logwatch] flushed ${accepted} log lines`);
+});
 
 // ── App ────────────────────────────────────────────────────────────────────────
 const app = express();

@@ -105,7 +105,9 @@ class LogWatch extends events_1.EventEmitter {
             return result;
         }
         catch (err) {
-            this.emit('error', err);
+            if (this.listenerCount('error') > 0) {
+                this.emit('error', err);
+            }
             return null;
         }
     }
@@ -128,7 +130,7 @@ class LogWatch extends events_1.EventEmitter {
                     self.log(`${ts} ${level} ${self.service} HTTP ${method} ${path} ${status} ${latency}ms`);
                 });
             }
-            return original.apply(this, args);
+            return original.apply(this, [event, ...args]);
         };
     }
     _post(lines) {

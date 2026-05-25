@@ -112,6 +112,10 @@ pub async fn start_consumer(
                     }
                 };
 
+                let org_id_str = m.key_view::<str>()
+                    .and_then(|k| k.ok())
+                    .unwrap_or("");
+
                 if let Ok((_, log_line)) = parse_log_line(payload) {
                     counter!("logwatch_logs_processed_total").increment(1);
 
@@ -134,13 +138,7 @@ pub async fn start_consumer(
                                     let severity = if score < -0.3 { "HIGH" } else { "MEDIUM" };
                                     counter!("logwatch_anomalies_detected_total", "severity" => severity).increment(1);
 
-                                    let org_id = sqlx::query_scalar::<_, Uuid>(
-                                        "SELECT id FROM organisations ORDER BY created_at LIMIT 1"
-                                    )
-                                    .fetch_optional(&db_pool)
-                                    .await
-                                    .unwrap_or(None)
-                                    .unwrap_or_else(Uuid::new_v4);
+                                    let org_id = Uuid::parse_str(org_id_str).unwrap_or_else(|_| Uuid::new_v4());
 
                                     let anomaly = Anomaly {
                                         id: Uuid::new_v4(),

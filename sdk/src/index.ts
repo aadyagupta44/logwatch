@@ -93,7 +93,9 @@ export class LogWatch extends EventEmitter {
       this.emit('flushed', result);
       return result;
     } catch (err) {
-      this.emit('error', err);
+      if (this.listenerCount('error') > 0) {
+        this.emit('error', err);
+      }
       return null;
     }
   }
@@ -118,7 +120,7 @@ export class LogWatch extends EventEmitter {
           self.log(`${ts} ${level} ${self.service} HTTP ${method} ${path} ${status} ${latency}ms`);
         });
       }
-      return original.apply(this, args as any);
+      return (original as Function).apply(this, [event, ...args]);
     };
   }
 

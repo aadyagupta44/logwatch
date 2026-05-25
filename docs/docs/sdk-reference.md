@@ -6,7 +6,7 @@ description: Full API reference for the @logwatch/node npm package.
 
 # SDK Reference — `@logwatch/node`
 
-Current version: **1.2.0**
+Current version: **1.2.2**
 
 ## Installation
 

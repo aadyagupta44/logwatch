@@ -9,7 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@logwatch/node": "^1.1.0",
+    "@logwatch/node": "^1.2.2",
     "express": "^5.2.1"
   },
   "description": ""

@@ -26,7 +26,7 @@ impl SlidingWindow {
 
     pub fn should_flush(&self) -> bool {
         if let Some(start) = self.start_time {
-            start.elapsed() >= Duration::from_secs(60)
+            start.elapsed() >= Duration::from_secs(20)
         } else {
             false
         }

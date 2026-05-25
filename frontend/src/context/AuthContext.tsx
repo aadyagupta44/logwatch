@@ -12,8 +12,11 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [token, setToken] = useState<string | null>(null);
-  const [user, setUser] = useState<any | null>(null);
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem('lw_token'));
+  const [user, setUser] = useState<any | null>(() => {
+    const u = localStorage.getItem('lw_user');
+    return u ? JSON.parse(u) : null;
+  });
 
   useEffect(() => {
     if (token) {
@@ -24,11 +27,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [token]);
 
   const login = (newToken: string, newUser: any) => {
+    localStorage.setItem('lw_token', newToken);
+    localStorage.setItem('lw_user', JSON.stringify(newUser));
     setToken(newToken);
     setUser(newUser);
   };
 
   const logout = () => {
+    localStorage.removeItem('lw_token');
+    localStorage.removeItem('lw_user');
     setToken(null);
     setUser(null);
   };
