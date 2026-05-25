@@ -6,7 +6,7 @@ description: Full reference for the LogWatch HTTP API.
 
 # REST API Reference
 
-Base URL: `https://api.logwatch.dev`
+Base URL: `https://logwatch-production.up.railway.app`
 
 All JSON responses use `Content-Type: application/json`. Timestamps are ISO 8601 UTC strings.
 
@@ -37,7 +37,7 @@ Register a new user account.
 | **Body** | `{ "email": string, "password": string, "orgName": string }` |
 
 ```bash
-curl -X POST https://api.logwatch.dev/auth/register \
+curl -X POST https://logwatch-production.up.railway.app/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email":"you@example.com","password":"s3cur3","orgName":"Acme"}'
 ```
@@ -62,7 +62,7 @@ Authenticate and receive a JWT.
 | **Body** | `{ "email": string, "password": string }` |
 
 ```bash
-curl -X POST https://api.logwatch.dev/auth/login \
+curl -X POST https://logwatch-production.up.railway.app/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"you@example.com","password":"s3cur3"}'
 ```
@@ -87,19 +87,20 @@ Ingest a batch of raw log lines. The SDK calls this automatically.
 | | |
 |---|---|
 | **Auth** | API Key |
-| **Body** | `{ "lines": string[], "service"?: string }` |
+| **Body** | `{ "logs": string[] }` |
 | **Limit** | Max 1 000 lines per request |
 
+Log line format: `{ISO 8601} {LEVEL} {service} HTTP {METHOD} {path} {status} {latency}ms`
+
 ```bash
-curl -X POST https://api.logwatch.dev/api/ingest \
-  -H "X-Api-Key: lw_live_sk_..." \
+curl -X POST https://logwatch-production.up.railway.app/api/ingest \
+  -H "X-Api-Key: lw_..." \
   -H "Content-Type: application/json" \
   -d '{
-    "lines": [
+    "logs": [
       "2024-06-01T12:00:00Z INFO payment-service HTTP GET /api/charge 200 45ms",
       "2024-06-01T12:00:01Z ERROR payment-service HTTP POST /api/charge 500 4321ms"
-    ],
-    "service": "payment-service"
+    ]
   }'
 ```
 
@@ -126,7 +127,7 @@ List anomalies for the authenticated organisation, with optional filters.
 | **Query params** | `service`, `severity` (`HIGH`\|`MEDIUM`), `from` (ISO 8601), `to` (ISO 8601), `page`, `size` |
 
 ```bash
-curl "https://api.logwatch.dev/anomalies?severity=HIGH&from=2024-06-01T00:00:00Z" \
+curl "https://logwatch-production.up.railway.app/anomalies?severity=HIGH&from=2024-06-01T00:00:00Z" \
   -H "Authorization: Bearer eyJ..."
 ```
 
@@ -140,11 +141,7 @@ curl "https://api.logwatch.dev/anomalies?severity=HIGH&from=2024-06-01T00:00:00Z
       "anomalyScore": -0.42,
       "severity": "HIGH",
       "acknowledged": false,
-      "featureVector": {
-        "totalCount": 87,
-        "errorCount": 43,
-        "avgLatencyMs": 3812.5
-      }
+      "featureVector": "[87,43,12,32,0.494,0.138,5]"
     }
   ],
   "totalElements": 14,
@@ -165,7 +162,7 @@ Get a single anomaly by ID.
 | **Auth** | JWT |
 
 ```bash
-curl "https://api.logwatch.dev/anomalies/a1b2c3d4-e5f6-..." \
+curl "https://logwatch-production.up.railway.app/anomalies/a1b2c3d4-e5f6-..." \
   -H "Authorization: Bearer eyJ..."
 ```
 
@@ -177,15 +174,7 @@ curl "https://api.logwatch.dev/anomalies/a1b2c3d4-e5f6-..." \
   "anomalyScore": -0.42,
   "severity": "HIGH",
   "acknowledged": false,
-  "featureVector": {
-    "totalCount": 87,
-    "errorCount": 43,
-    "warnCount": 12,
-    "avgLatencyMs": 3812.5,
-    "p99LatencyMs": 7844.0,
-    "uniqueErrorCount": 3,
-    "errorRatio": 0.494
-  }
+  "featureVector": "[87,43,12,32,0.494,0.138,5]"
 }
 ```
 
@@ -200,7 +189,7 @@ Get all anomalies for a specific service name.
 | **Auth** | JWT |
 
 ```bash
-curl "https://api.logwatch.dev/anomalies/service/payment-service" \
+curl "https://logwatch-production.up.railway.app/anomalies/service/payment-service" \
   -H "Authorization: Bearer eyJ..."
 ```
 
@@ -227,7 +216,7 @@ Aggregate stats for the authenticated org (total count, breakdown by severity).
 | **Auth** | JWT |
 
 ```bash
-curl "https://api.logwatch.dev/anomalies/summary" \
+curl "https://logwatch-production.up.railway.app/anomalies/summary" \
   -H "Authorization: Bearer eyJ..."
 ```
 
@@ -252,7 +241,7 @@ Mark an anomaly as acknowledged (mutes further alerts for it).
 | **Auth** | JWT |
 
 ```bash
-curl -X PATCH "https://api.logwatch.dev/anomalies/a1b2c3d4-.../acknowledge" \
+curl -X PATCH "https://logwatch-production.up.railway.app/anomalies/a1b2c3d4-.../acknowledge" \
   -H "Authorization: Bearer eyJ..."
 ```
 
@@ -269,7 +258,7 @@ Permanently delete an anomaly record.
 | **Auth** | JWT |
 
 ```bash
-curl -X DELETE "https://api.logwatch.dev/anomalies/a1b2c3d4-..." \
+curl -X DELETE "https://logwatch-production.up.railway.app/anomalies/a1b2c3d4-..." \
   -H "Authorization: Bearer eyJ..."
 ```
 
@@ -291,7 +280,7 @@ Generate a new API key for the authenticated org.
 | **Body** | `{ "name": string }` |
 
 ```bash
-curl -X POST https://api.logwatch.dev/api-keys \
+curl -X POST https://logwatch-production.up.railway.app/api-keys \
   -H "Authorization: Bearer eyJ..." \
   -H "Content-Type: application/json" \
   -d '{"name":"production-server"}'
@@ -321,7 +310,7 @@ List all API keys for the authenticated org (keys are masked).
 | **Auth** | JWT |
 
 ```bash
-curl "https://api.logwatch.dev/api-keys" \
+curl "https://logwatch-production.up.railway.app/api-keys" \
   -H "Authorization: Bearer eyJ..."
 ```
 
@@ -347,7 +336,7 @@ Revoke an API key immediately.
 | **Auth** | JWT |
 
 ```bash
-curl -X DELETE "https://api.logwatch.dev/api-keys/k1l2m3n4-..." \
+curl -X DELETE "https://logwatch-production.up.railway.app/api-keys/k1l2m3n4-..." \
   -H "Authorization: Bearer eyJ..."
 ```
 

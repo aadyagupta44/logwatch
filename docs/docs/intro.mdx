@@ -6,14 +6,14 @@ description: What LogWatch is and how it works.
 
 # Introduction
 
-LogWatch is an AI-powered log anomaly detection platform. Instrument your Node.js services with a one-line SDK call, and LogWatch will automatically detect unusual patterns in your log streams — from error spikes to abnormal request volumes — using a streaming IsolationForest model running in a Rust engine.
+LogWatch is an AI-powered log anomaly detection platform. Instrument any Node.js service with two lines of code and LogWatch automatically detects unusual patterns in your log streams — error spikes, request volume anomalies, latency outliers — using a streaming IsolationForest model running in a Rust engine.
 
 ## How it works
 
-1. **Instrument** — Add `@logwatch/node` to your service and initialise it with your API key.
-2. **Stream** — The SDK intercepts `console.*` calls, batches them, and POSTs them to the LogWatch ingest endpoint.
-3. **Analyse** — The Rust engine aggregates logs into 60-second per-service windows, extracts a 7-feature vector, and runs ONNX inference.
-4. **Alert** — Anomalies are persisted to the database and appear on your dashboard within seconds.
+1. **Instrument** — Add `@logwatch/node` to your service and call `LogWatch.init({ apiKey, service }).attach()`. The SDK patches `http.Server.prototype.emit` at the Node.js core level, so every HTTP request is captured automatically regardless of which framework you use.
+2. **Stream** — The SDK batches log lines every 5 seconds and POSTs them to the LogWatch ingest API. Each batch is published to Kafka with your organisation ID as the message key.
+3. **Analyse** — The Rust engine aggregates log lines into 20-second per-service sliding windows, extracts a 7-feature vector, and runs ONNX inference with an IsolationForest model.
+4. **Alert** — Anomalies are persisted to the database and appear on your dashboard within seconds. Click any anomaly for a plain-English description and an interactive debugging panel backed by Groq.
 
 ## Next steps
 

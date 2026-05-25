@@ -16,24 +16,23 @@ LogWatch is a streaming ML pipeline. Logs flow from your application through a c
 ┌────────────────────────────────────────────────────────────────────────┐
 │                          Your Application                              │
 │                                                                        │
-│   console.log("Payment processed")  ──►  @logwatch/node SDK           │
-│                                          (batches, gzip, HTTP POST)   │
+│   LogWatch.init({ apiKey, service }).attach()                         │
+│   (patches http.Server.prototype.emit — any Node.js framework)        │
 └───────────────────────────────┬────────────────────────────────────────┘
                                 │  POST /api/ingest  (API Key auth)
+                                │  { "logs": ["...log lines..."] }
                                 ▼
 ┌───────────────────────────────────────────────────────────────────────┐
 │                        Spring Boot API  :8080                         │
 │                                                                        │
 │   • Validates API key  →  resolves orgId                              │
-│   • Parses & enriches log lines                                       │
-│   • Publishes batches to Kafka topic  raw-logs                        │
+│   • Publishes raw log lines to Kafka (orgId as message key)           │
 │   • Exposes REST endpoints for dashboard (JWT auth)                   │
-│   • Exposes  /actuator/prometheus  for metrics scraping               │
 └───────────────────────────────┬───────────────────────────────────────┘
                                 │  Kafka producer  (topic: raw-logs)
                                 ▼
 ┌───────────────────────────────────────────────────────────────────────┐
-│                    Apache Kafka  :9092                                 │
+│                    Apache Kafka  (Redpanda Cloud)                      │
 │                                                                        │
 │   Topics:                                                              │
 │     raw-logs       ──►  consumed by Rust Engine                       │
@@ -42,18 +41,18 @@ LogWatch is a streaming ML pipeline. Logs flow from your application through a c
                │  Kafka consumer  (group: rust-engine-group)
                ▼
 ┌───────────────────────────────────────────────────────────────────────┐
-│                       Rust Engine  :9090                               │
+│                       Rust Engine                                      │
 │                                                                        │
 │  ┌────────────┐    ┌──────────────────┐    ┌────────────────────────┐ │
 │  │ nom parser │ →  │ Sliding Window   │ →  │ Feature Extraction     │ │
-│  │            │    │ (60 s per svc)   │    │ 7-dim vector:          │ │
+│  │            │    │ (20 s per svc)   │    │ 7-dim vector:          │ │
 │  └────────────┘    └──────────────────┘    │  total_count           │ │
 │                                            │  error_count           │ │
 │                                            │  warn_count            │ │
 │                                            │  info_count            │ │
 │                                            │  error_ratio           │ │
 │                                            │  warn_ratio            │ │
-│                                            │  unique_components     │ │
+│                                            │  unique_endpoints      │ │
 │                                            └──────────┬─────────────┘ │
 │                                                       │               │
 │                                         ┌─────────────▼─────────────┐ │
@@ -62,19 +61,11 @@ LogWatch is a streaming ML pipeline. Logs flow from your application through a c
 │                                         │ score < 0.0 → anomaly     │ │
 │                                         │ score < -0.1 → HIGH sev.  │ │
 │                                         └─────────────┬─────────────┘ │
-│                                                       │               │
-│                              ┌────────────────────────▼──────────────┐│
-│                              │  Metrics (Prometheus /metrics)        ││
-│                              │  logwatch_logs_processed_total        ││
-│                              │  logwatch_anomalies_detected_total    ││
-│                              │  logwatch_inference_duration_ms       ││
-│                              │  logwatch_kafka_consumer_lag          ││
-│                              └───────────────────────────────────────┘│
-└──────────────┬────────────────────────────────────────────────────────┘
+└──────────────┬────────────────────────────────────────┘               │
                │  INSERT anomaly row
                ▼
 ┌───────────────────────────────────────────────────────────────────────┐
-│                       PostgreSQL  :5432                                │
+│                       PostgreSQL  (Neon)                               │
 │                                                                        │
 │   Table: anomalies                                                     │
 │   ─────────────────────────────────────────────────────               │
@@ -96,26 +87,19 @@ LogWatch is a streaming ML pipeline. Logs flow from your application through a c
 │   GET  /anomalies/summary      →  org-level stats                     │
 │   PATCH /anomalies/{id}/ack    →  mark acknowledged                   │
 └──────────────┬────────────────────────────────────────────────────────┘
-               │  REST + WebSocket (JWT auth)
+               │  REST + polling  (JWT auth)
                ▼
 ┌───────────────────────────────────────────────────────────────────────┐
-│                      React Dashboard  :5173                            │
+│                      React Dashboard  (Vercel)                         │
 │                                                                        │
-│   • Anomaly feed with real-time updates                               │
+│   • Anomaly feed with real-time polling                               │
 │   • Per-service severity timeline                                     │
+│   • Anomaly detail                                                    │
+│     – plain-English description generated from feature vector         │
+│     – 7-feature breakdown with percentage bars                        │
+│     – Ask LLM panel (Groq llama-3.3-70b-versatile) for debugging     │
 │   • Acknowledge / delete actions                                      │
 │   • API key management                                                │
-└───────────────────────────────────────────────────────────────────────┘
-
-┌───────────────────────────────────────────────────────────────────────┐
-│                     Observability Layer                                │
-│                                                                        │
-│   Prometheus :9091  ──scrapes──►  rust-engine:9090/metrics            │
-│                     ──scrapes──►  spring-api:8080/actuator/prometheus │
-│                                                                        │
-│   Grafana    :3000  ──queries──►  Prometheus                          │
-│   6 panels: logs/sec, anomalies/sec, inference p99,                   │
-│             Kafka lag, API request rate, anomaly pie chart            │
 └───────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -125,16 +109,16 @@ LogWatch is a streaming ML pipeline. Logs flow from your application through a c
 
 ### `@logwatch/node` SDK
 
-A lightweight Node.js agent that intercepts `console.*` calls, buffers lines in memory, and flushes batches to the Spring Boot ingest endpoint over HTTPS. Configured with `apiKey`, `service`, `flushInterval`, and `maxBatchSize`. Emits `onFlush` and `onError` events.
+A lightweight Node.js agent (zero runtime dependencies) that patches `http.Server.prototype.emit` at the Node.js core level. Because it operates below any framework, it automatically captures every HTTP request your server handles — no middleware, no console intercepting, no per-route instrumentation. Lines are buffered in memory and flushed every 5 seconds (or when the buffer reaches 100 lines) via `POST /api/ingest`. Configured with `apiKey`, `service`, `flushInterval`, and `batchSize`. Emits `flushed` and `error` events.
 
 ### Spring Boot API
 
-The user-facing gateway. Handles registration, login, API key management, and anomaly queries. On ingest it validates the API key, resolves the organisation, and publishes raw log lines to Kafka without any ML processing — keeping the HTTP response fast. Also reads anomalies back from Postgres and serves them to the React dashboard.
+The user-facing gateway. Handles registration, login, API key management, and anomaly queries. On ingest it validates the API key, resolves the organisation, and publishes raw log lines to Kafka with the `orgId` as the Kafka message key — keeping the HTTP response fast and pushing all ML work downstream. Also reads anomalies back from Postgres and serves them to the React dashboard.
 
-### Apache Kafka
+### Apache Kafka (Redpanda Cloud)
 
 The durable message bus between ingestion and processing. Two topics:
-- **`raw-logs`** — ingested by Spring, consumed by Rust Engine.
+- **`raw-logs`** — ingested by Spring, consumed by Rust Engine. OrgId is carried as the Kafka message key so the Rust engine never needs a DB lookup to attribute anomalies.
 - **`anomaly-alerts`** — published by Rust Engine for downstream consumers (webhooks, Slack, PagerDuty).
 
 Kafka decouples the ingest rate from the ML inference throughput and provides a replayable audit log.
@@ -142,17 +126,16 @@ Kafka decouples the ingest rate from the ML inference throughput and provides a 
 ### Rust Engine
 
 The performance-critical stream processor. Written in async Rust with Tokio. Runs a `StreamConsumer` loop that:
-1. Parses each log line with a `nom`-based parser.
-2. Aggregates lines into per-service 60-second sliding windows.
-3. When a window closes, extracts a 7-dimensional feature vector.
-4. Runs the feature vector through an ONNX IsolationForest model.
-5. If the anomaly score is below 0.0, persists an anomaly row to Postgres and publishes to `anomaly-alerts`.
-
-The Rust Engine also exposes a Prometheus `/metrics` endpoint on port 9090.
+1. Reads the `orgId` from the Kafka message key.
+2. Parses each log line with a `nom`-based zero-copy parser.
+3. Aggregates lines into per-service **20-second sliding windows**.
+4. When a window closes, extracts a 7-dimensional feature vector.
+5. Runs the feature vector through an ONNX IsolationForest model.
+6. If the anomaly score is below 0.0, persists an anomaly row to Postgres and publishes to `anomaly-alerts`.
 
 ### ONNX IsolationForest model
 
-Trained offline on synthetic HTTP log data (52,632 samples matching the feature distributions of real HTTP service logs). The model is an unsupervised IsolationForest (100 estimators, 5% contamination) exported to ONNX with `skl2onnx` via `training/retrain_http.py`. At inference time `ort` loads it as a native ONNX Runtime session. No Python interpreter at runtime.
+Trained offline on synthetic HTTP log data (52,632 samples matching the feature distributions of real HTTP service logs). The model is an unsupervised IsolationForest (100 estimators, 5% contamination) exported to ONNX with `skl2onnx` via `training/train.py`. At inference time `ort` loads it as a native ONNX Runtime session. No Python interpreter at runtime.
 
 ### PostgreSQL
 
@@ -160,7 +143,9 @@ Single relational store for users, organisations, API keys, and anomalies. Sprin
 
 ### React Dashboard
 
-A Vite-based SPA served on port 5173. Authenticates via JWT, polls the Spring Boot API for anomaly feeds, and lets users acknowledge or delete anomaly records and manage API keys.
+A Vite-based SPA served on Vercel. Authenticates via JWT (persisted to localStorage across page refreshes), polls the Spring Boot API for anomaly feeds, and lets users acknowledge or delete anomaly records and manage API keys.
+
+**Anomaly detail page** generates a plain-English description from the feature vector values, shows a breakdown of all 7 model inputs, and provides an "Ask LLM" panel: a Groq-backed chat interface pre-loaded with the full anomaly context. Users can ask diagnostic questions like "what could cause this error spike?" and get answers from `llama-3.3-70b-versatile` in under two seconds.
 
 ---
 
@@ -178,7 +163,7 @@ SDK  →  Spring Boot (ingest)  →  Kafka raw-logs  →  Rust Engine
                                               React Dashboard
 ```
 
-The entire path from a log line being emitted in your app to it appearing as an anomaly in the dashboard takes under **90 seconds** in normal conditions (60 s sliding window + ~5 s Kafka latency + ~1 s DB write + polling interval).
+The entire path from a log line being emitted in your app to it appearing as an anomaly in the dashboard takes under **30 seconds** in normal conditions (20 s sliding window + ~5 s Kafka latency + ~1 s DB write + polling interval).
 
 ---
 
@@ -187,8 +172,8 @@ The entire path from a log line being emitted in your app to it appearing as an 
 | Property | Value |
 |---|---|
 | Algorithm | IsolationForest |
-| Training data | Synthetic HTTP log data (52,632 samples, `training/retrain_http.py`) |
-| Features | 7-dimensional (see feature vector above) |
+| Training data | Synthetic HTTP log data (52,632 samples, `training/train.py`) |
+| Features | 7-dimensional (total requests, error/warn/info counts, error/warn ratios, unique endpoints) |
 | Contamination | 5% |
 | Estimators | 100 |
 | Anomaly threshold | score < 0.0 |

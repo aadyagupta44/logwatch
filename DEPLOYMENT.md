@@ -164,8 +164,10 @@ org.apache.kafka.common.security.scram.ScramLoginModule required username="YOUR_
 3. Framework: **Vite**. Build command: `npm run build`. Output: `dist`.
 4. Under **Environment Variables**, add:
    ```
-   VITE_API_BASE_URL = https://logwatch-production.up.railway.app
+   VITE_API_BASE_URL  = https://logwatch-production.up.railway.app
+   VITE_GROQ_API_KEY  = <your Groq API key>  ← get one free at console.groq.com
    ```
+   `VITE_GROQ_API_KEY` powers the **Ask LLM** button on anomaly detail pages. If omitted, users will be prompted to enter their own key in the browser.
 5. Click **Deploy**. Build takes ~1 minute.
 6. Copy your Vercel URL — e.g. `https://logwatch-frontend-xxx.vercel.app`.
 
@@ -231,7 +233,7 @@ curl -X POST $API/api/ingest \
   -H "X-Api-Key: YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "lines": [
+    "logs": [
       "2024-06-01T12:00:00Z ERROR payment-service HTTP GET /api/charge 500 5234ms",
       "2024-06-01T12:00:01Z ERROR payment-service HTTP GET /api/charge 500 4921ms",
       "2024-06-01T12:00:02Z ERROR payment-service HTTP GET /api/charge 500 6100ms",
@@ -242,7 +244,7 @@ curl -X POST $API/api/ingest \
 # → {"accepted":5,"dropped":0}
 ```
 
-### Wait ~60 seconds, then check anomalies
+### Wait ~20 seconds, then check anomalies
 
 ```bash
 curl $API/anomalies \
@@ -288,6 +290,7 @@ Navigate to your Vercel URL → Log in → Dashboard shows your first anomaly.
 | Variable | Required | Notes |
 |---|---|---|
 | `VITE_API_BASE_URL` | Yes | Railway Spring Boot public URL |
+| `VITE_GROQ_API_KEY` | No | Groq API key — enables Ask LLM on anomaly detail pages |
 
 ---
 
