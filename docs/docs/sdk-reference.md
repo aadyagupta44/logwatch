@@ -6,59 +6,104 @@ description: Full API reference for the @logwatch/node npm package.
 
 # SDK Reference — `@logwatch/node`
 
+Current version: **1.1.0**
+
 ## Installation
 
 ```bash
 npm install @logwatch/node
 ```
 
+---
+
+## `LogWatch.init()` — recommended
+
+```typescript
+LogWatch.init(config: LogWatchConfig): LogWatch
+```
+
+Creates a global singleton instance and starts the flush timer. Call once at app startup.
+
+```js
+const { LogWatch } = require('@logwatch/node');
+
+const lw = LogWatch.init({
+  apiKey: process.env.LOGWATCH_API_KEY,
+  service: 'payment-service',
+  baseUrl: 'https://logwatch-production.up.railway.app',
+});
+```
+
+---
+
 ## Constructor
+
+If you need multiple instances (e.g. one per service in a monorepo), use `new` directly:
 
 ```typescript
 const lw = new LogWatch(config: LogWatchConfig);
+lw.attach(); // must call attach() manually when using new
 ```
 
-### Configuration options
+---
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `apiKey` | `string` | **required** | Your LogWatch API key. Generate one at **Settings → API Keys**. |
-| `baseUrl` | `string` | `https://api.logwatch.dev` | Override to point at a self-hosted or staging LogWatch instance. |
-| `service` | `string` | `"default"` | The service name attached to every log line. Appears in the dashboard sidebar. |
-| `flushInterval` | `number` (ms) | `10000` | How often the buffer is flushed to the LogWatch ingest endpoint. Lower values reduce latency at the cost of more HTTP requests. |
-| `maxBatchSize` | `number` | `500` | Maximum number of log lines in a single batch. If the buffer exceeds this, an early flush is triggered. |
-| `debug` | `boolean` | `false` | Print SDK internals (flush timings, batch sizes) to `stderr`. |
+## Configuration
 
 ```typescript
 interface LogWatchConfig {
   apiKey: string;
-  baseUrl?: string;
   service?: string;
+  baseUrl?: string;
   flushInterval?: number;
-  maxBatchSize?: number;
-  debug?: boolean;
+  batchSize?: number;
 }
 ```
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `apiKey` | `string` | **required** | Your LogWatch API key. Generate one at **Settings → API Keys**. |
+| `service` | `string` | `"service"` | Service name embedded in every log line — appears on the dashboard. |
+| `baseUrl` | `string` | `http://localhost:8080` | LogWatch ingest API URL. Point this at your deployed instance. |
+| `flushInterval` | `number` (ms) | `5000` | How often the buffer is flushed. Lower values reduce latency at the cost of more requests. |
+| `batchSize` | `number` | `100` | Flush immediately when the buffer reaches this many lines. |
 
 ---
 
 ## Methods
 
+### `expressMiddleware()`
+
+```typescript
+lw.expressMiddleware(): (req, res, next) => void
+```
+
+Returns an Express/Connect middleware function. Mount it with `app.use()` and every HTTP request is automatically captured in the format the LogWatch engine expects.
+
+```js
+app.use(lw.expressMiddleware());
+```
+
+Each request produces a log line like:
+
+```
+2024-01-15T10:23:45Z ERROR payment-service HTTP POST /payments 500 1243ms
+```
+
+The level is derived from the response status code: `ERROR` for 5xx, `WARN` for 4xx, `INFO` for everything else.
+
+---
+
 ### `attach()`
 
 ```typescript
-lw.attach(): void
+lw.attach(): this
 ```
 
-Starts the SDK. Patches `console.log`, `console.warn`, and `console.error` to capture output and starts the background flush timer.
+Starts the background flush timer. Called automatically by `LogWatch.init()`. If you use `new LogWatch()` directly, call `attach()` manually.
 
-Call this **once** at application startup, before any other code logs output. Calling it more than once is a no-op.
-
-```typescript
-import { LogWatch } from '@logwatch/node';
-
-const lw = new LogWatch({ apiKey: process.env.LOGWATCH_API_KEY!, service: 'orders-api' });
-lw.attach(); // <— call once, early in your entrypoint
+```js
+const lw = new LogWatch({ apiKey: '...', service: 'my-api' });
+lw.attach();
 ```
 
 ---
@@ -66,181 +111,123 @@ lw.attach(); // <— call once, early in your entrypoint
 ### `detach()`
 
 ```typescript
-await lw.detach(): Promise<void>
+lw.detach(): this
 ```
 
-Stops capturing logs, flushes any remaining buffered lines synchronously, and cancels the interval timer. Returns a `Promise` that resolves once the final flush completes.
+Stops the flush timer and drains any remaining buffered lines. Use during graceful shutdown:
 
-Use this during graceful shutdown:
-
-```typescript
+```js
 process.on('SIGTERM', async () => {
-  await lw.detach();
-  process.exit(0);
+  lw.detach();
+  server.close();
 });
 ```
 
 ---
 
-### `simulateAnomaly()`
+### `log(line)`
 
 ```typescript
-lw.simulateAnomaly(options?: SimulateOptions): void
+lw.log(line: string): this
 ```
 
-Emits a synthetic burst of error logs designed to trigger the anomaly detection model within one 60-second window. Useful for integration testing.
+Buffer a raw log line manually. Use this for background jobs, queue consumers, or anything outside HTTP requests.
+
+The line must follow this format for the ML engine to parse it:
+
+```
+{ISO timestamp} {LEVEL} {service-name} HTTP {METHOD} {path} {status} {latency}ms
+```
+
+Example:
+
+```js
+const ts = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+lw.log(`${ts} ERROR payment-service HTTP POST /payments/retry 500 3200ms`);
+```
+
+---
+
+### `flush()`
 
 ```typescript
-lw.simulateAnomaly({ count: 30, latencyMs: 5000 });
+lw.flush(): Promise<FlushResult | null>
 ```
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `count` | `number` | `25` | Number of error log lines to emit. |
-| `latencyMs` | `number` | `4000` | Synthetic latency value embedded in each log line. |
+Manually flush all buffered lines immediately. Returns `null` if the buffer is empty.
+
+```typescript
+interface FlushResult {
+  accepted: number;
+  dropped: number;
+}
+```
 
 ---
 
 ## Events
 
-The `LogWatch` instance is an `EventEmitter`. Subscribe with `.on(event, handler)`.
+`LogWatch` extends `EventEmitter`. Subscribe with `.on(event, handler)`.
 
-### `onFlush`
+### `flushed`
 
-Fired after each successful batch is delivered to the ingest endpoint.
+Fired after each successful batch is delivered.
 
-```typescript
-lw.on('onFlush', (stats: FlushStats) => {
-  console.debug(`Flushed ${stats.count} lines in ${stats.durationMs}ms`);
+```js
+lw.on('flushed', ({ accepted, dropped }) => {
+  console.log(`Flushed ${accepted} lines`);
 });
 ```
 
-```typescript
-interface FlushStats {
-  count: number;       // number of log lines in this batch
-  durationMs: number;  // round-trip time for the HTTP request
-  timestamp: Date;
-}
-```
+### `error`
 
-### `onError`
+Fired when a flush fails (network error or 4xx/5xx from the API). Your app continues running — that batch is dropped.
 
-Fired when a flush fails (network error, 4xx/5xx from the API).
-
-```typescript
-lw.on('onError', (err: FlushError) => {
+```js
+lw.on('error', (err) => {
   console.error('LogWatch flush failed:', err.message);
-  // Your app keeps running — logs are dropped for this batch.
 });
-```
-
-```typescript
-interface FlushError {
-  message: string;
-  statusCode?: number; // present for HTTP errors
-  retryable: boolean;
-}
 ```
 
 ---
 
-## Framework examples
+## Full Express example
 
-### Express
-
-```typescript
-import express from 'express';
-import { LogWatch } from '@logwatch/node';
-
-const lw = new LogWatch({
-  apiKey: process.env.LOGWATCH_API_KEY!,
-  service: 'express-api',
-  flushInterval: 5000,
-  maxBatchSize: 200,
-});
-
-lw.attach();
+```js
+const express = require('express');
+const { LogWatch } = require('@logwatch/node');
 
 const app = express();
+app.use(express.json());
+
+const lw = LogWatch.init({
+  apiKey: process.env.LOGWATCH_API_KEY,
+  service: 'payment-service',
+  baseUrl: 'https://logwatch-production.up.railway.app',
+  flushInterval: 5000,
+});
+
+lw.on('flushed', ({ accepted }) => {
+  if (accepted > 0) console.log(`[logwatch] flushed ${accepted} lines`);
+});
+
+// Auto-log every request
+app.use(lw.expressMiddleware());
+
+app.post('/payments', (req, res) => {
+  res.json({ id: `pay_${Date.now()}`, status: 'success' });
+});
 
 app.get('/health', (req, res) => {
-  console.log('Health check OK');
-  res.json({ status: 'up' });
+  res.json({ status: 'ok' });
 });
 
-const server = app.listen(3000);
+const server = app.listen(3000, () => {
+  console.log('Server running on :3000');
+});
 
-process.on('SIGTERM', async () => {
+process.on('SIGTERM', () => {
+  lw.detach();
   server.close();
-  await lw.detach();
 });
 ```
-
----
-
-### Next.js (App Router)
-
-Add to `instrumentation.ts` (Next.js 14+):
-
-```typescript
-// instrumentation.ts
-export async function register() {
-  if (process.env.NEXT_RUNTIME === 'nodejs') {
-    const { LogWatch } = await import('@logwatch/node');
-
-    const lw = new LogWatch({
-      apiKey: process.env.LOGWATCH_API_KEY!,
-      service: 'nextjs-app',
-    });
-
-    lw.attach();
-  }
-}
-```
-
-Enable instrumentation in `next.config.ts`:
-
-```typescript
-const nextConfig = {
-  experimental: {
-    instrumentationHook: true,
-  },
-};
-
-export default nextConfig;
-```
-
----
-
-### Fastify
-
-```typescript
-import Fastify from 'fastify';
-import { LogWatch } from '@logwatch/node';
-
-const lw = new LogWatch({
-  apiKey: process.env.LOGWATCH_API_KEY!,
-  service: 'fastify-api',
-});
-
-lw.attach();
-
-const app = Fastify({ logger: true });
-
-app.get('/', async () => ({ hello: 'world' }));
-
-const start = async () => {
-  await app.listen({ port: 3000 });
-};
-
-start();
-
-process.on('SIGINT', async () => {
-  await app.close();
-  await lw.detach();
-});
-```
-
-:::note Fastify logger
-Fastify uses `pino` for logging, which does **not** go through `console.log`. To capture Fastify's own log output, pass `logger: false` and use `console.log` manually, or stream pino output through a custom transport.
-:::

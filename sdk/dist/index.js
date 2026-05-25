@@ -43,9 +43,18 @@ class LogWatch extends events_1.EventEmitter {
         this.buffer = [];
         this.timer = null;
         this.apiKey = config.apiKey;
+        this.service = config.service ?? 'service';
         this.baseUrl = config.baseUrl ?? 'http://localhost:8080';
         this.flushInterval = config.flushInterval ?? 5000;
         this.batchSize = config.batchSize ?? 100;
+    }
+    /**
+     * Create a global singleton instance and start flushing.
+     * Call once at app startup — use anywhere via the returned instance.
+     */
+    static init(config) {
+        LogWatch.instance = new LogWatch(config).attach();
+        return LogWatch.instance;
     }
     /** Start periodic flushing of buffered log lines. */
     attach() {
@@ -65,7 +74,7 @@ class LogWatch extends events_1.EventEmitter {
         this.emit('detached');
         return this;
     }
-    /** Buffer a single log line for ingestion. */
+    /** Buffer a single raw log line for ingestion. */
     log(line) {
         const trimmed = line.trimEnd();
         if (trimmed) {
@@ -75,6 +84,28 @@ class LogWatch extends events_1.EventEmitter {
             }
         }
         return this;
+    }
+    /**
+     * Express/Connect middleware.
+     * Drop it in with app.use(lw.expressMiddleware()) and every HTTP request
+     * is automatically captured and shipped to LogWatch in the correct format.
+     */
+    expressMiddleware() {
+        const self = this;
+        return function logwatchMiddleware(req, res, next) {
+            const start = Date.now();
+            res.on('finish', () => {
+                const latency = Date.now() - start;
+                const ts = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+                const status = res.statusCode;
+                const level = status >= 500 ? 'ERROR' : status >= 400 ? 'WARN' : 'INFO';
+                const method = req.method ?? 'GET';
+                const path = req.path ?? req.url ?? '/';
+                const line = `${ts} ${level} ${self.service} HTTP ${method} ${path} ${status} ${latency}ms`;
+                self.log(line);
+            });
+            next();
+        };
     }
     /** Flush all buffered lines to the LogWatch ingest API. */
     async flush() {
@@ -93,7 +124,7 @@ class LogWatch extends events_1.EventEmitter {
     }
     _post(lines) {
         return new Promise((resolve, reject) => {
-            const body = JSON.stringify({ lines });
+            const body = JSON.stringify({ logs: lines });
             const url = new URL('/api/ingest', this.baseUrl);
             const isHttps = url.protocol === 'https:';
             const transport = isHttps ? https : http;
@@ -105,7 +136,7 @@ class LogWatch extends events_1.EventEmitter {
                 headers: {
                     'Content-Type': 'application/json',
                     'Content-Length': Buffer.byteLength(body),
-                    'X-Api-Key': this.apiKey,
+                    'X-API-Key': this.apiKey,
                 },
             };
             const req = transport.request(options, (res) => {
@@ -134,5 +165,6 @@ class LogWatch extends events_1.EventEmitter {
     }
 }
 exports.LogWatch = LogWatch;
+LogWatch.instance = null;
 exports.default = LogWatch;
 //# sourceMappingURL=index.js.map

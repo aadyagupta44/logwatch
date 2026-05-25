@@ -23,6 +23,9 @@ const LandingPage: React.FC = () => {
             <span className="font-bold text-lg tracking-tight">LogWatch</span>
           </div>
           <div className="flex items-center gap-2">
+            <a href="https://logwatchdocssite.vercel.app/" target="_blank" rel="noreferrer" className="px-4 py-2 text-sm text-slate-400 hover:text-white transition rounded-lg hover:bg-white/5">
+              Docs
+            </a>
             <Link to="/login" className="px-4 py-2 text-sm text-slate-400 hover:text-white transition rounded-lg hover:bg-white/5">
               Login
             </Link>
