@@ -38,13 +38,11 @@ public class ApiKeyFilter extends OncePerRequestFilter {
             return;
         }
 
-        final String authHeader = request.getHeader("Authorization");
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        final String rawKey = request.getHeader("X-API-Key");
+        if (rawKey == null || rawKey.isBlank()) {
             filterChain.doFilter(request, response);
             return;
         }
-
-        String rawKey = authHeader.substring(7);
         
         // Since we store hashes, we need to find the active keys and compare.
         // For performance, usually we'd have a prefix or something, but here we'll just check.
