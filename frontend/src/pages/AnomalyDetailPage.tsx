@@ -22,7 +22,7 @@ const FEATURE_NAMES = [
 
 // ── Auto-generated anomaly description ────────────────────────────────────────
 function buildDescription(features: number[], severity: string, service: string): string {
-  const [total, errors, warns, , errorRatio, warnRatio, uniqueEndpoints] = features;
+  const [total, errors, , , errorRatio, warnRatio, uniqueEndpoints] = features;
 
   if (!total) return 'Insufficient data to generate a description.';
 
