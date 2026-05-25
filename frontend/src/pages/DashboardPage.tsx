@@ -7,75 +7,10 @@ import {
 } from 'recharts';
 import {
   Activity, AlertCircle, Shield, Cpu, ExternalLink, CheckCircle2, Loader2,
-  LayoutDashboard, Settings, Key, Bell, TrendingUp, TrendingDown, Minus, RefreshCw
+  Bell, TrendingUp, TrendingDown, Minus, RefreshCw
 } from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-
-const SIDEBAR_LINKS = [
-  { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
-  { label: 'Settings', icon: Settings, path: '/settings' },
-  { label: 'API Keys', icon: Key, path: '/settings' },
-];
-
-const Sidebar: React.FC = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { user } = useAuth();
-
-  return (
-    <aside className="w-64 shrink-0 bg-slate-900 border-r border-slate-800 flex flex-col h-screen sticky top-0">
-      {/* Logo */}
-      <div className="px-6 py-5 border-b border-slate-800">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center shrink-0">
-            <Activity className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <p className="text-white font-bold text-sm leading-none">LogWatch</p>
-            <p className="text-slate-500 text-xs mt-0.5">Anomaly Detection</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-1">
-        {SIDEBAR_LINKS.map((link) => {
-          const active = location.pathname === link.path;
-          return (
-            <button
-              key={link.label}
-              onClick={() => navigate(link.path)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                active
-                  ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
-              }`}
-            >
-              <link.icon className="w-4 h-4" />
-              {link.label}
-            </button>
-          );
-        })}
-      </nav>
-
-      {/* User */}
-      <div className="px-4 py-4 border-t border-slate-800">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center shrink-0">
-            <span className="text-white text-xs font-bold">
-              {user?.email?.[0]?.toUpperCase() ?? 'U'}
-            </span>
-          </div>
-          <div className="min-w-0">
-            <p className="text-white text-xs font-medium truncate">{user?.email}</p>
-            <p className="text-slate-500 text-xs truncate">{user?.organisationName}</p>
-          </div>
-        </div>
-      </div>
-    </aside>
-  );
-};
+import { useNavigate } from 'react-router-dom';
+import Sidebar from '../components/Sidebar';
 
 const StatCard = ({
   title, value, icon, color, trend
@@ -164,7 +99,7 @@ const DashboardPage: React.FC = () => {
 
   if (summaryLoading || tableLoading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex">
+      <div className="flex h-screen w-screen bg-slate-950 overflow-hidden">
         <Sidebar />
         <div className="flex-1 flex items-center justify-center">
           <div className="flex flex-col items-center gap-3">
@@ -177,10 +112,10 @@ const DashboardPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex">
+    <div className="flex h-screen w-screen bg-slate-950 text-white overflow-hidden">
       <Sidebar />
 
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top bar */}
         <header className="bg-slate-900/50 border-b border-slate-800 px-8 py-4 flex items-center justify-between shrink-0">
           <div>

@@ -49,10 +49,10 @@ public class AuthService {
                 .build();
         userRepository.save(user);
 
-        // Create API Key
+        // Create API Key (stored as plain text — UUID has sufficient entropy)
         String rawKey = UUID.randomUUID().toString();
         ApiKey apiKey = ApiKey.builder()
-                .keyHash(passwordEncoder.encode(rawKey))
+                .keyHash(rawKey)
                 .organisation(organisation)
                 .isActive(true)
                 .build();
@@ -102,12 +102,12 @@ public class AuthService {
         
         String rawKey = UUID.randomUUID().toString();
         ApiKey apiKey = ApiKey.builder()
-                .keyHash(passwordEncoder.encode(rawKey))
+                .keyHash(rawKey)
                 .organisation(organisation)
                 .isActive(true)
                 .build();
         apiKeyRepository.save(apiKey);
-        
+
         return rawKey;
     }
 }
