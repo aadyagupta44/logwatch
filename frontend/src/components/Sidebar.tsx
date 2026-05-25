@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Activity, LayoutDashboard, Settings, Key, LogOut } from 'lucide-react';
+import { Activity, LayoutDashboard, Key, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const NAV_LINKS = [
