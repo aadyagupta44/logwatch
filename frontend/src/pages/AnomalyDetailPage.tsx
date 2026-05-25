@@ -114,11 +114,13 @@ async function callGroq(apiKey: string, messages: Message[], systemPrompt: strin
 }
 
 // ── LLM Chat panel ─────────────────────────────────────────────────────────────
+const ENV_GROQ_KEY = (import.meta as any).env?.VITE_GROQ_API_KEY ?? '';
+
 const LLMPanel: React.FC<{ anomaly: any; features: number[]; description: string; onClose: () => void }> = ({
   anomaly, features, description, onClose
 }) => {
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('groq_api_key') ?? '');
-  const [keyConfirmed, setKeyConfirmed] = useState(() => !!localStorage.getItem('groq_api_key'));
+  const [apiKey, setApiKey] = useState(() => ENV_GROQ_KEY || localStorage.getItem('groq_api_key') || '');
+  const [keyConfirmed, setKeyConfirmed] = useState(() => !!(ENV_GROQ_KEY || localStorage.getItem('groq_api_key')));
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
