@@ -28,13 +28,15 @@ public class ApiKeyFilter extends OncePerRequestFilter {
             @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
 
+        log.info("[ApiKeyFilter] path={}", request.getServletPath());
+
         if (!request.getServletPath().startsWith("/api/ingest")) {
             filterChain.doFilter(request, response);
             return;
         }
 
         final String rawKey = request.getHeader("X-API-Key");
-        log.info("[ApiKeyFilter] path={} key_present={}", request.getServletPath(), rawKey != null);
+        log.info("[ApiKeyFilter] key_present={}", rawKey != null);
 
         if (rawKey == null || rawKey.isBlank()) {
             log.warn("[ApiKeyFilter] No X-API-Key header on /api/ingest request");
