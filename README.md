@@ -18,11 +18,11 @@ That's it. LogWatch patches `http.Server.prototype.emit` below your framework la
 
 From there, a five-stage streaming pipeline runs automatically:
 
-1. **Ingest** — The SDK batches log lines every 5 seconds and POSTs them to the Spring Boot API authenticated by your API key.
-2. **Buffer** — Spring Boot validates the key, resolves your organisation ID, and publishes raw log lines to a Kafka topic (`raw-logs`) with the orgId as the message key.
-3. **Parse** — The Rust engine consumes the topic and parses each line with a `nom`-based zero-copy parser, extracting method, path, status, and latency.
-4. **Score** — Lines are aggregated into 20-second per-service sliding windows. When each window closes, a 7-dimensional feature vector is fed to an ONNX IsolationForest model. Scores below 0.0 are anomalies; below −0.1 are HIGH severity.
-5. **Surface** — Anomalies are persisted to PostgreSQL and appear in the React dashboard. Click any anomaly to see a plain-English description of what the model observed and an interactive "Ask LLM" panel backed by Groq for debugging.
+1. **Ingest** - The SDK batches log lines every 5 seconds and POSTs them to the Spring Boot API authenticated by your API key.
+2. **Buffer** - Spring Boot validates the key, resolves your organisation ID, and publishes raw log lines to a Kafka topic (`raw-logs`) with the orgId as the message key.
+3. **Parse** - The Rust engine consumes the topic and parses each line with a `nom`-based zero-copy parser, extracting method, path, status, and latency.
+4. **Score** - Lines are aggregated into 20-second per-service sliding windows. When each window closes, a 7-dimensional feature vector is fed to an ONNX IsolationForest model. Scores below 0.0 are anomalies; below −0.1 are HIGH severity.
+5. **Surface** - Anomalies are persisted to PostgreSQL and appear in the React dashboard. Click any anomaly to see a plain-English description of what the model observed and an interactive "Ask LLM" panel backed by Groq for debugging.
 
 ---
 
@@ -76,18 +76,19 @@ From there, a five-stage streaming pipeline runs automatically:
 ---
 
 ## Demo Video
+https://github.com/user-attachments/assets/2a70a3d4-fba5-4490-a120-e3592ec58164
 
 > The demo uses `demo-service/server.js` — a self-contained Express app that simulates a payment microservice with realistic auto-traffic, then lets you trigger cascading failures with a single curl command.
 
-### Step 1 — Open the docs
+### Step 1 - Open the docs
 
 Navigate to **[https://logwatchdocssite.vercel.app](https://logwatchdocssite.vercel.app)** → Quickstart. The page shows the exact two lines you need to instrument any Node.js service.
 
-### Step 2 — Register and copy your API key
+### Step 2 - Register and copy your API key
 
 Open the dashboard → Register → **Settings → API Keys → Generate key**. Copy `lw_...`.
 
-### Step 3 — Instrument the demo service
+### Step 3 - Instrument the demo service
 
 `demo-service/server.js` is a realistic Express service simulating payments, orders, and auth. The entire LogWatch integration lives at the top of the file:
 
@@ -103,7 +104,7 @@ LogWatch.init({
 
 The same two lines work for **any** Node.js framework — LogWatch attaches below Express, not inside it.
 
-### Step 4 — Run the service
+### Step 4 - Run the service
 
 ```bash
 cd demo-service
@@ -126,7 +127,7 @@ The service starts on port 3000 and immediately begins simulating traffic — 3 
 [logwatch] flushed 15 log lines
 ```
 
-### Step 5 — Enable chaos mode
+### Step 5 - Enable chaos mode
 
 ```bash
 curl -X POST http://localhost:3000/chaos/enable
@@ -134,15 +135,15 @@ curl -X POST http://localhost:3000/chaos/enable
 
 The payment service now fails on 85% of requests (`500 Payment gateway timeout`) with latency spiking to 1.5–4 seconds per request. The remaining services (orders, auth) stay healthy — the anomaly detector isolates the fault to `payment-service`.
 
-### Step 6 — Watch the dashboard
+### Step 6 - Watch the dashboard
 
 After ~20 seconds, the IsolationForest model flags the window. Open the dashboard — the anomaly appears with severity HIGH. Click it to see:
 
-- **Plain-English description** — "payment-service is experiencing critical failure conditions. In this 20-second window, 85% of requests failed with 5xx status codes. Error ratio is 3.2× above the learned normal baseline."
-- **Feature breakdown** — all 7 model inputs displayed with percentage bars so you can see exactly which signals drove the score.
-- **Ask LLM** — backed by Groq's `llama-3.3-70b-versatile`. Type "What could cause this spike in 500s?" and get debugging guidance in under two seconds.
+- **Plain-English description** - "payment-service is experiencing critical failure conditions. In this 20-second window, 85% of requests failed with 5xx status codes. Error ratio is 3.2× above the learned normal baseline."
+- **Feature breakdown** - all 7 model inputs displayed with percentage bars so you can see exactly which signals drove the score.
+- **Ask LLM** - backed by Groq's `llama-3.3-70b-versatile`. Type "What could cause this spike in 500s?" and get debugging guidance in under two seconds.
 
-### Step 7 — Restore normal
+### Step 7 - Restore normal
 
 ```bash
 curl -X POST http://localhost:3000/chaos/disable
@@ -312,4 +313,4 @@ Fork → branch off `main` → open a pull request. CI must be green before merg
 
 ## License
 
-MIT © 2025 LogWatch
+MIT © 2026 LogWatch
