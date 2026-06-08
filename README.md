@@ -285,7 +285,7 @@ logwatch/
 
 | | URL |
 |---|---|
-| **Dashboard** | https://logwatch-app.vercel.app |
+| **Dashboard** | https://logwatch-eight.vercel.app/ |
 | **API** | https://logwatch-production.up.railway.app |
 | **Docs** | https://logwatchdocssite.vercel.app |
 | **npm** | https://www.npmjs.com/package/@logwatch/node |
